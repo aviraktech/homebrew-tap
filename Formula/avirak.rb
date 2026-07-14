@@ -27,19 +27,27 @@ class Avirak < Formula
     assert_match(/\Aavirak \d+\.\d+\.\d+\n\z/, shell_output("#{bin}/avirak version"))
 
     # setup/doctor/uninstall must be safe to exercise in `brew test` without
-    # touching the real machine — point everything at a scratch HOME. brew
-    # test's stdin is non-interactive, so `setup` (no --yes/--all) declines
-    # the optional sweep/integrations prompts and only links the skills.
+    # touching the real machine — point everything at a scratch HOME.
+    # Explicitly redirect stdin from /dev/null (not just relying on brew
+    # test's own stdin being non-interactive — it can inherit a real tty
+    # depending on invocation context, which would otherwise send `setup`
+    # into its interactive confirm() prompts and stall for up to a minute
+    # on their 30s read timeouts) so setup/uninstall deterministically
+    # decline the optional sweep/integrations prompts immediately, without
+    # enabling real sweep work.
     fake_home = testpath/"fake-home"
     fake_home.mkpath
 
-    system bin/"avirak", "setup", "--home", fake_home
+    # Formula#system doesn't accept Kernel#system's `in:` kwarg (sorbet
+    # signature only allows Integer/Pathname/String/Symbol args), so
+    # redirect stdin from /dev/null via an explicit shell command instead.
+    system "#{bin}/avirak setup --home #{fake_home} < /dev/null"
     assert_predicate fake_home/".agents/skills/avirak", :symlink?
     assert_predicate fake_home/".agents/skills/gh-workflow", :symlink?
     # avirak logs to stderr, not stdout — redirect it in so shell_output
     # actually captures the "readable through link" lines.
     assert_match "readable through link", shell_output("#{bin}/avirak doctor --home #{fake_home} 2>&1")
-    system bin/"avirak", "uninstall", "--home", fake_home
+    system "#{bin}/avirak uninstall --home #{fake_home} < /dev/null"
     refute_predicate fake_home/".agents/skills/avirak", :exist?
   end
 end
