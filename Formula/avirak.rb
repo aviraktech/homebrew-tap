@@ -2,8 +2,8 @@ class Avirak < Formula
   desc "AI Head-of-Engineering: portable lead persona + gh-workflow skill payload"
   homepage "https://github.com/aviraktech/avirak"
   url "ssh://git@github.com/aviraktech/avirak.git",
-      tag:      "v0.1.0",
-      using:    :git # filled in by the release step — see the tap README for the checksum command
+      tag:      "v0.2.0",
+      using:    :git # repo is private; switch to tarball+sha256 (see tap README) once it's public
   license "MIT"
   head "https://github.com/aviraktech/avirak.git", branch: "main"
 
