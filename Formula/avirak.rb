@@ -1,9 +1,12 @@
+# frozen_string_literal: true
+
+# AI Head-of-Engineering: portable lead persona + gh-workflow skill payload.
 class Avirak < Formula
   desc "AI Head-of-Engineering: portable lead persona + gh-workflow skill payload"
   homepage "https://github.com/aviraktech/avirak"
   url "ssh://git@github.com/aviraktech/avirak.git",
-      tag:      "v0.2.0",
-      using:    :git # repo is private; switch to tarball+sha256 (see tap README) once it's public
+      tag:   "v0.2.0",
+      using: :git # repo is private; switch to tarball+sha256 (see tap README) once it's public
   license "MIT"
   head "https://github.com/aviraktech/avirak.git", branch: "main"
 
@@ -49,6 +52,6 @@ class Avirak < Formula
     # actually captures the "readable through link" lines.
     assert_match "readable through link", shell_output("#{bin}/avirak doctor --home #{fake_home} 2>&1")
     system "#{bin}/avirak uninstall --home #{fake_home} < /dev/null"
-    refute_predicate fake_home/".agents/skills/avirak", :exist?
+    refute_path_exists fake_home/".agents/skills/avirak"
   end
 end
