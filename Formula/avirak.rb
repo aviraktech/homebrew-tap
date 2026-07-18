@@ -5,29 +5,47 @@ class Avirak < Formula
   desc "AI Head-of-Engineering: portable lead persona + gh-workflow skill payload"
   homepage "https://github.com/aviraktech/avirak"
   url "ssh://git@github.com/aviraktech/avirak.git",
-      tag:   "v0.2.0",
+      tag:   "v0.3.0",
       using: :git # repo is private; switch to tarball+sha256 (see tap README) once it's public
   license "MIT"
   head "https://github.com/aviraktech/avirak.git", branch: "main"
 
+  depends_on "go" => :build
+
+  # All four are still RUNTIME deps of the shipped bash payload (dispatch.sh,
+  # herd-events.sh, the gh-workflow scripts), which stays bash by ruling
+  # (avirak#58). Retiring bin/avirak and install-sweep.sh did not drop any of
+  # them — the Go binary itself shells out to none of them.
   depends_on "bash"
   depends_on "gh"
   depends_on "jq"
   depends_on "python@3.11"
 
   def install
-    # Ship the whole payload (skills/, bin/) into libexec, then symlink the
-    # CLI entry point onto PATH. bin/avirak resolves its own real location
-    # (following this symlink) to find its sibling skills/ directory at
-    # runtime, so nothing here may copy just bin/ in isolation.
+    # Ship the whole payload (skills/, launchd/) into libexec, then build the
+    # unified binary INTO that payload and symlink it onto PATH.
     libexec.install Dir["*"]
+
+    # The output path is not arbitrary: avirak finds skills/ and the launchd
+    # plist template by resolving its own location (following the bin symlink
+    # below) and walking TWO directories up. libexec/bin/avirak is what makes
+    # that land on libexec. Until v0.3.0 this path held the bash entrypoint;
+    # the Go binary now takes its place.
+    cd libexec do
+      system "go", "build",
+             "-trimpath",
+             "-ldflags", "-X main.version=#{stable.version}",
+             "-o", libexec/"bin/avirak",
+             "./cmd/avirak"
+    end
+
     bin.install_symlink libexec/"bin/avirak"
   end
 
   test do
-    # bin/avirak's own baked-in VERSION, independent of the formula's
-    # stable/HEAD version string (a HEAD build's `version` is HEAD-<rev>,
-    # which never matches the CLI's own semver).
+    # stable.version, NOT version: on a HEAD build `version` is "HEAD-<rev>",
+    # which would both stamp a non-semver into the binary and fail the regex
+    # below. The install block stamps stable.version for the same reason.
     assert_match(/\Aavirak \d+\.\d+\.\d+\n\z/, shell_output("#{bin}/avirak version"))
 
     # setup/doctor/uninstall must be safe to exercise in `brew test` without
