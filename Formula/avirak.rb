@@ -5,17 +5,19 @@ class Avirak < Formula
   desc "AI Head-of-Engineering: portable lead persona + gh-workflow skill payload"
   homepage "https://github.com/aviraktech/avirak"
   url "ssh://git@github.com/aviraktech/avirak.git",
-      tag:   "v0.7.3",
+      tag:   "v0.8.0",
       using: :git # repo is private; switch to tarball+sha256 (see tap README) once it's public
   license "MIT"
   head "https://github.com/aviraktech/avirak.git", branch: "main"
 
   depends_on "go" => :build
 
-  # All four are still RUNTIME deps of the shipped bash payload (dispatch.sh,
-  # herd-events.sh, the gh-workflow scripts), which stays bash by ruling
-  # (avirak#58). Retiring bin/avirak and install-sweep.sh did not drop any of
-  # them — the Go binary itself shells out to none of them.
+  # All four are still RUNTIME deps of the surviving skills/gh-workflow scripts
+  # (file-issue.sh, init-config.sh, post-persona-handshake.sh,
+  # select-quality-mode.sh), which stay bash by ruling (avirak#58). Epic #207
+  # ported dispatch.sh + herd-events.sh to the `avirak dispatch` Go verb and
+  # deleted them (v0.8.0), but that dropped no dep — the surviving scripts still
+  # need bash/gh/jq/python, and the Go binary shells out to none of them.
   depends_on "bash"
   depends_on "gh"
   depends_on "jq"
