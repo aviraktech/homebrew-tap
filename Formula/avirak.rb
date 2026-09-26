@@ -11,6 +11,12 @@ class Avirak < Formula
   head "https://github.com/aviraktech/avirak.git", branch: "main"
 
   depends_on "go" => :build
+  # RUNTIME dep since avirak#417: both shipped ACP adapters (codex-acp and
+  # claude-agent-acp) are Node programs, vendored into libexec below. Being the
+  # formula's ONE node dependency is also what lets Homebrew's cleaner rewrite
+  # their `#!/usr/bin/env node` shebangs to this node's absolute path, so a
+  # dispatch never depends on whatever `node` happens to be on PATH.
+  depends_on "node"
 
   # All four are still RUNTIME deps of the surviving skills/gh-workflow scripts
   # (file-issue.sh, init-config.sh, post-persona-handshake.sh,
@@ -39,6 +45,19 @@ class Avirak < Formula
              "-ldflags", "-X main.version=#{stable.version}",
              "-o", libexec/"bin/avirak",
              "./cmd/avirak"
+    end
+
+    # avirak#417: vendor the pinned ACP adapters into avirak's OWN libexec —
+    # never globally. The payload carries the one pin (package.json) and a
+    # lockfile (npm-shrinkwrap.json) pinning every transitive dependency with
+    # its sha512; `npm ci` installs EXACTLY that lockfile or fails, and the
+    # binary embeds the same package.json, so this formula spells no adapter
+    # version of its own and cannot disagree with the binary about one.
+    # std_npm_args(prefix: false) is Homebrew's local-install argument set
+    # (--ignore-scripts, its npm cache, the release cooldown). Everything is
+    # fetched HERE, at install time; nothing is fetched when avirak dispatches.
+    cd libexec/"internal/acpadapter/npm" do
+      system "npm", "ci", *std_npm_args(prefix: false)
     end
 
     bin.install_symlink libexec/"bin/avirak"
@@ -70,7 +89,21 @@ class Avirak < Formula
     assert_predicate fake_home/".agents/skills/gh-workflow", :symlink?
     # avirak logs to stderr, not stdout — redirect it in so shell_output
     # actually captures the "readable through link" lines.
-    assert_match "readable through link", shell_output("#{bin}/avirak doctor --home #{fake_home} 2>&1")
+    doctor = shell_output("#{bin}/avirak doctor --home #{fake_home} 2>&1")
+    assert_match "readable through link", doctor
+
+    # avirak#417: the vendored ACP adapters exist and report their pinned
+    # versions — offline, and without executing either adapter. `version
+    # --verbose` prints the pins compiled into the binary; doctor compares them
+    # against what `npm ci` installed (present, executable, installed
+    # package.json version == pin) and names each entry's interpreter, which
+    # must be THIS formula's node (the cleaner's shebang rewrite).
+    verbose = shell_output("#{bin}/avirak version --verbose")
+    node = Regexp.escape((Formula["node"].opt_bin/"node").to_s)
+    %w[codex-acp claude-agent-acp].each do |id|
+      assert_match(%r{^pinned @agentclientprotocol/#{id} \d+\.\d+\.\d+ }, verbose)
+      assert_match(/\[ok\] acp adapter\s+#{id} \d+\.\d+\.\d+ installed at its pin \(.*, via #{node};/, doctor)
+    end
     system "#{bin}/avirak uninstall --home #{fake_home} < /dev/null"
     refute_path_exists fake_home/".agents/skills/avirak"
   end
